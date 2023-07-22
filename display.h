@@ -144,7 +144,7 @@ void resetDisplayKelly() {
 
 void initDisplay() {
   tft.begin();
-  tft.setRotation(1);
+  tft.setRotation(3);
   tft.setBrightness(180);
   tft.fillScreen(TFT_BLACK);
 }

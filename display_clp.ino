@@ -176,12 +176,15 @@ void setup() {
 
   // Kelly Serial init
   KellySerial.begin(19200, SERIAL_8N1, 4, 2); //rx 16, tx 17 green to RX2 and blue to TX2 black to GND (blau auf pin tx 2 und gruen auf pin rx 4)
+  while (!Serial) {
+    delay(10);
+  }
   delay(100);
   KellySerial.write(kelly.command[0], 3);
 
   //***************************Set Time RTC********************
   // DS3231 seconds, minutes, hours, day (1=sunday), date, month, year
-  //setDS3231time(30,40,21,2,30,7,18);
+  //setDS3231time(30,22,17,6,19,5,23);
   //**************************************************************
 }
 
@@ -199,7 +202,7 @@ void loop() {
       if (BMS.updateVoltCur) {
         pRemoteCharacteristic_write->writeValue(BMS.command[0], sizeof(BMS.command[0]));
         BMS.updateVoltCur = false;
-        Serial.println("Request BMS Data: Volt current SOC"); 
+        //Serial.println("Request BMS Data: Volt current SOC"); 
       } else {
         pRemoteCharacteristic_write->writeValue(BMS.command[BMS.msgData], sizeof(BMS.command[BMS.msgData]));
         BMS.msgData++;
@@ -207,8 +210,8 @@ void loop() {
         if (BMS.msgData > 4) {
           BMS.msgData = 1;
         }
-        Serial.print("Request BMS Data: "); 
-        Serial.println(BMS.msgData);
+        //Serial.print("Request BMS Data: "); 
+        //Serial.println(BMS.msgData);
       }
       BMS.updateAmpHour();
       updateDisplayBMS();
@@ -227,28 +230,57 @@ void loop() {
     }
   }
 
-  
   // receive data from kelly controller
   if (KellySerial.available()) {
     kelly.timeout = 0;
     kelly.clearOldErrorMsg();
-    std::vector<uint8_t> receivedData(19, 0);
+    std::vector<uint8_t> receivedData(64, 0);
     //Serial.print("Kelly received msg: ");
-    for (int i=0; i<19; i++) {
-      receivedData.at(i) = KellySerial.read();
-      //Serial.print(receivedData.at(i), HEX);
-      //Serial.print(" ");
-      delay(20); // delete? neuer code (delay 1 statt 10)
+
+    //-------- NEU -----------
+    int rvcdDataIdx = 0;
+    long receiveTimeout = millis();
+    //Serial.print("received data length: ");
+    //Serial.println(KellySerial.available());
+    while (KellySerial.available()) {
+      receivedData.at(rvcdDataIdx) = KellySerial.read();
+      rvcdDataIdx++;
+      //Serial.print("rvcdDataIdx: ");
+      //Serial.print(rvcdDataIdx);
+      //Serial.print(": ");
+      //Serial.println(receivedData.at(rvcdDataIdx-1));
+      if ((millis() - receiveTimeout) > 200) {
+        errorHandler.setErrorMsg("Kelly receive timeout: no kelly data updated");
+        break;
+      }      
     }
-    //Serial.println("");
-    kelly.updateKellyData(receivedData);
+    std::vector<uint8_t> receivedDataShort(19, 0);
+    //Serial.print("message length: ");
+    //Serial.println(rvcdDataIdx);
+    int firstByteIdx = 0;
+    for (int i = 0; i < receivedData.size(); i++) {
+      if (receivedData.at(i) == 58 || receivedData.at(i) == 59) {
+        firstByteIdx = i;
+        break;
+      } 
+    }
+    for (int i = 0; i <= 18; i++) {
+      receivedDataShort.at(i) = receivedData.at(i + firstByteIdx); 
+      //Serial.print("received data sortiert: ");
+      //Serial.print(i);
+      //Serial.print(": ");
+      //Serial.println(receivedDataShort.at(i));
+    }
+    kelly.updateKellyData(receivedDataShort);
+    //-------- NEU ENDE-----------
+
     //kelly.printCurrentControllerData();
     KellySerial.write(kelly.command[kelly.commandNum], 3); //sizeof() instead of 3? --> sizeof(kelly.command[kelly.commandNum])
     kelly.commandNum++;
     if (kelly.commandNum > 1) {
       kelly.commandNum = 0;
     }
-    if (kelly.getSpeed() <= 1 ) {
+    if (kelly.getSpeed() >= 1 ) {
       writeTotalKmToSD(kelly.getTotalKm());
     }
     updateDisplayKelly();
@@ -259,29 +291,11 @@ void loop() {
   } else {
     kelly.timeout++;
     if (kelly.timeout > 10) {
-      Serial.println("reset connection!!!!!!!!!!!!");
-      KellySerial.end();
-      delay(500);
-      KellySerial.begin(19200, SERIAL_8N1, 4, 2);
-      delay(100);
       errorHandler.setErrorMsg("Kelly connection timeout: send new request");
       KellySerial.write(kelly.command[kelly.commandNum], 3);
       resetDisplayKelly();
     }
   }
-
-  if (kelly.timeout > 10) {
-  Serial.println("reset connection!!!!!!!!!!!!");
-  KellySerial.end();
-  delay(500);
-  KellySerial.begin(19200, SERIAL_8N1, 4, 2);
-  delay(100);
-  errorHandler.setErrorMsg("Kelly connection timeout: send new request");
-  KellySerial.write(kelly.command[kelly.commandNum], 3);
-  resetDisplayKelly();
-  }
-
-
 
   //GPIO read and update display
   updateDisplayGPIO();
@@ -307,7 +321,7 @@ void loop() {
   }
   
   Serial.println("----------------------");
-  delay(200);
+  delay(100);
 }
 
 

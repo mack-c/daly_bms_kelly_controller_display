@@ -2,12 +2,13 @@ class Kelly {
   public:
     void updateKellyData(std::vector<uint8_t> rcvdData) {
       if (calcCheckSum(rcvdData)) { //neuer code --> funktioniert das?
-        Serial.println("Checksum matches!! --> update kelly data");
+        //Serial.println("Checksum matches!! --> update kelly data");
         if (rcvdData.at(0) >= 58 && rcvdData.at(0) <= 60) {
-          Serial.print("Kelly rvcd msg: ");
+          //Serial.print("Kelly rvcd msg: ");
           for (int i = 0; i < 19; i++) {
             currentControllerData_[rcvdData.at(0)-58][i] = rcvdData.at(i);
-            Serial.print(rcvdData[i]);
+            //Serial.print(rcvdData[i]);
+            
             Serial.print(" ");
           }
           Serial.println("");
@@ -59,7 +60,6 @@ class Kelly {
       phaseCurrent |= currentControllerData_[1][6]; //which bytes are for phase current?
       phaseCurrent <<= 8;
       phaseCurrent |=  currentControllerData_[1][7]; //which bytes are for phase current?
-      
       return phaseCurrent;
     }
 
@@ -70,9 +70,7 @@ class Kelly {
       speedRpm |= currentControllerData_[1][4];
       speedRpm <<= 8;
       speedRpm |=  currentControllerData_[1][5];
-      Serial.print("speed: ");
       speedKmh = (speedRpm/gearRatio_)*2*3.1416*(wheelSize_/2.0)*(1/60.0)*3.6;
-      Serial.println(speedKmh);
       return speedKmh;
     }
 
@@ -85,7 +83,7 @@ class Kelly {
       timeKmCalc_ = millis();
       Serial.print("loop time kelly km: ");
       Serial.println(timeframe);
-      distanceKm_ = distanceKm_ + getSpeed() * (timeframe/3600000);
+      distanceKm_ = distanceKm_ + getSpeed() * (timeframe/3600000.0);
     }
 
     void setTotalKmOld(int totalKmOldSD) {
@@ -164,11 +162,15 @@ class Kelly {
     };
 
     
-    byte currentControllerData_[3][19];
+    byte currentControllerData_[3][19] = {
+      {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+      {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, 
+      {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0} 
+    };
     //byte receivedData_[19];
     std::string errorMsg_ = "";
     const uint8_t gearRatio_ = 5;
-    const float wheelSize_ = 0.41; //m --> 16 inch (missing tire thickness)
+    const float wheelSize_ = 0.52; //m --> 16 inch + tube thickness
     float distanceKm_ = 0.0;
     int totalKm_;
     int totalKmOld_;

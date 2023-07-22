@@ -25,8 +25,8 @@ class BMS {
         Serial.println("BMS: received data wrong length");
         errorMsg_ = "BMS: received data wrong length";
       }
-      Serial.print("updated array: ");
-      Serial.println(receivedData_[2]);
+      //Serial.print("updated array: ");
+      //Serial.println(receivedData_[2]);
     }
 
     void printCurrentBmsData() {
@@ -94,8 +94,10 @@ class BMS {
       timeAmpCalc_ = millis(); 
       Serial.print("loop time amp calc: ");
       Serial.println(timeframe);
-      ampMilliSec_ = ampMilliSec_ + (getCurrent() * timeframe);
-      ampHour_ = ampMilliSec_ / 3600000.0; //aktuell amp sek.. /3600000 fuer amp stunden
+      if (timeframe < 700) { //greater 700 --> unrealistic value
+        ampMilliSec_ = round(ampMilliSec_ + (getCurrent() * timeframe));
+        ampHour_ = ampMilliSec_ / 3600000.0; //aktuell amp sek.. /3600000 fuer amp stunden
+      }
     }
 
     float getAmpHour() {
@@ -103,12 +105,19 @@ class BMS {
     }
 
     float getAmphPerKm(float km) {
-      amphPerKm_ = ampHour_ / km;
+      if (km > 0.01) {
+        amphPerKm_ = ampHour_ / km;
+      }
       return amphPerKm_;
     }
 
     int getRange() {
-      int range = (30 - ampHour_) / amphPerKm_;
+      int range = 0;
+      if ((millis() - timeStartRange_) < 10000) { //in den ersten paar sekunden kommen falsche werte
+        restCapacity_ = 30.0 - ((54.2 - getVoltage()) * 2.46); //annahme 30ah hat der volle akku, 2,46 ist ein schaetzwert
+      } else {
+        range = round((restCapacity_ - ampHour_) / amphPerKm_);
+      }
       return range;
     }
 
@@ -290,10 +299,12 @@ class BMS {
     uint8_t currentBmsData_[9][13];
     float voltageBuffer_[10] = {53.0, 53.0, 53.0, 53.0, 53.0, 53.0, 53.0, 53.0, 53.0, 53.0};
     int ampMilliSec = 0;
+    float restCapacity_ = 0.0;
     float ampHour_ = 0.0;
-    float amphPerKm_ = 0.0;
+    float amphPerKm_ = 0.65;
     uint8_t voltageBufferIdx = 0;
     int ampMilliSec_ = 0;
     std::string errorMsg_;
     unsigned long timeAmpCalc_ = millis();
+    unsigned long timeStartRange_ = millis();
 };
